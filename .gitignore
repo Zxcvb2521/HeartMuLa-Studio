@@ -7,6 +7,7 @@ __pycache__/
 venv/
 ENV/
 .env
+backend/.env
 
 # Node
 node_modules/
@@ -51,3 +52,4 @@ htmlcov/
 # Generated tokens
 backend/generated_tokens/*
 !backend/generated_tokens/.gitkeep
+.env

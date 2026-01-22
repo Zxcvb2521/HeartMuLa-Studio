@@ -10,6 +10,7 @@ interface ComposerSidebarProps {
     onGenerate: (data: CompositionData) => void;
     isGenerating: boolean;
     lyricsModels: LLMModel[];
+    modelsLoaded?: boolean;
     languages: string[];
     onGenerateLyrics: (topic: string, modelId: string, provider: string, language: string, currentLyrics?: string) => Promise<{ lyrics: string; suggested_topic: string; suggested_tags: string }>;
     isGeneratingLyrics: boolean;
@@ -51,6 +52,7 @@ export const ComposerSidebar: React.FC<ComposerSidebarProps> = ({
     onGenerate,
     isGenerating,
     lyricsModels,
+    modelsLoaded = false,
     languages,
     onGenerateLyrics,
     isGeneratingLyrics,
@@ -394,7 +396,7 @@ export const ComposerSidebar: React.FC<ComposerSidebarProps> = ({
                             } focus:outline-none`}
                         >
                             {lyricsModels.length === 0 ? (
-                                <option value={0}>Loading...</option>
+                                <option value={0}>{modelsLoaded ? 'No LLM (optional)' : 'Loading...'}</option>
                             ) : (
                                 lyricsModels.map((m, idx) => (
                                     <option key={m.id} value={idx}>

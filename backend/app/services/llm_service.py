@@ -28,7 +28,7 @@ SUPPORTED_LANGUAGES = [
     "Swedish", "Danish", "Norwegian", "Finnish", "Greek", "Hebrew", "Thai", "Vietnamese"
 ]
 
-# OpenRouter API Key (set via environment variable)
+# OpenRouter API Key (set via environment variable or .env file)
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
 class LLMService:

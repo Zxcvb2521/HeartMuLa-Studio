@@ -475,7 +475,7 @@ export const HistoryFeed: React.FC<HistoryFeedProps> = ({ history, currentJobId,
             </div>
 
             {/* Progress Bar for generating */}
-            {job.status === 'processing' && (
+            {(job.status === 'processing' || job.status === 'queued') && (
                 <div className="mt-4">
                     <div className={`h-1.5 rounded-full overflow-hidden ${darkMode ? 'bg-[#404040]' : 'bg-slate-200'}`}>
                         <motion.div
@@ -489,31 +489,49 @@ export const HistoryFeed: React.FC<HistoryFeedProps> = ({ history, currentJobId,
                             transition={{ duration: 0.3, ease: 'easeOut' }}
                         />
                     </div>
-                    <p className={`text-xs mt-1.5 ${darkMode ? 'text-[#727272]' : 'text-slate-400'}`}>
-                        {(jobProgress.get(job.id)?.progress || 0) >= 100
-                            ? 'Finalizing your track...'
-                            : jobProgress.get(job.id)?.msg || ''
-                        }
-                    </p>
+                    <div className="flex items-center justify-between mt-1.5">
+                        <p className={`text-xs ${darkMode ? 'text-[#727272]' : 'text-slate-400'}`}>
+                            {(jobProgress.get(job.id)?.progress || 0) >= 100
+                                ? 'Finalizing your track...'
+                                : jobProgress.get(job.id)?.msg || (job.status === 'queued' ? 'Waiting in queue...' : 'Starting...')
+                            }
+                        </p>
+                        <button
+                            onClick={() => handleDelete(job.id)}
+                            className={`text-xs px-2 py-1 rounded transition-colors ${darkMode ? 'text-red-400 hover:bg-red-500/20' : 'text-rose-500 hover:bg-rose-100'}`}
+                            title="Delete stuck job"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                 </div>
             )}
 
-            {/* Error Message with Retry */}
+            {/* Error Message with Retry/Delete */}
             {job.status === 'failed' && (
                 <div className={`mt-4 p-3 rounded-lg ${darkMode ? 'bg-[#282828]' : 'bg-rose-50/50 border border-rose-100'}`}>
                     <div className={`flex items-center gap-2 text-sm ${darkMode ? 'text-red-400' : 'text-rose-600'}`}>
                         <AlertCircle className="w-4 h-4 flex-shrink-0" />
                         <span className="flex-1">{job.error_msg || "Generation failed"}</span>
                     </div>
-                    {onRetry && (
+                    <div className="mt-3 flex gap-2">
+                        {onRetry && (
+                            <button
+                                onClick={() => onRetry(job)}
+                                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${darkMode ? 'bg-white text-black hover:scale-105' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                            >
+                                <RotateCw className="w-4 h-4" />
+                                Try Again
+                            </button>
+                        )}
                         <button
-                            onClick={() => onRetry(job)}
-                            className={`mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${darkMode ? 'bg-white text-black hover:scale-105' : 'bg-slate-900 text-white hover:bg-slate-800'}`}
+                            onClick={() => handleDelete(job.id)}
+                            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${darkMode ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-rose-100 text-rose-600 hover:bg-rose-200'}`}
                         >
-                            <RotateCw className="w-4 h-4" />
-                            Try Again
+                            <Trash2 className="w-4 h-4" />
+                            Delete
                         </button>
-                    )}
+                    </div>
                 </div>
             )}
 

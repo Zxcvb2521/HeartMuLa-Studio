@@ -16,6 +16,16 @@ from tokenizers import Tokenizer
 
 logger = logging.getLogger(__name__)
 
+def cleanup_gpu_memory():
+    """Clean up GPU memory before loading models."""
+    gc.collect()
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            with torch.cuda.device(i):
+                torch.cuda.empty_cache()
+                torch.cuda.synchronize()
+        logger.info("GPU memory cleaned up")
+
 def get_gpu_memory(device_id):
     props = torch.cuda.get_device_properties(device_id)
     return props.total_memory / (1024 ** 3)
@@ -92,11 +102,16 @@ class MusicService:
             load_muq_mulan=load_muq_mulan,
         )
 
-    async def initialize(self, model_path: str = "/home/l1/Desktop/heartlib/ckpt", version: str = "3B"):
+    async def initialize(self, model_path: str = "HeartMuLa", version: str = "3B"):
         if self.pipeline is not None or self.is_loading:
             return
 
         self.is_loading = True
+
+        # Clean up GPU memory before loading
+        logger.info("Cleaning up GPU memory before loading...")
+        cleanup_gpu_memory()
+
         logger.info(f"Loading Heartlib model from {model_path}...")
         try:
             # Run blocking load in executor to avoid freezing async loop
@@ -114,50 +129,52 @@ class MusicService:
 
     async def generate_task(self, job_id: str, request: GenerationRequest, db_engine):
         """Background task to generate music."""
-        job_id = str(job_id) # Ensure string for dictionary keys
+        from uuid import UUID as PyUUID
+        job_id_str = str(job_id) # String for dictionary keys
+        job_id_uuid = PyUUID(job_id_str) if isinstance(job_id, str) else job_id  # UUID for DB queries
 
         # Add to queue and broadcast position
-        self.job_queue.append(job_id)
-        queue_pos = self.get_queue_position(job_id)
-        logger.info(f"Job {job_id} added to queue at position {queue_pos}")
-        event_manager.publish("job_queued", {"job_id": job_id, "position": queue_pos, "total": len(self.job_queue)})
+        self.job_queue.append(job_id_str)
+        queue_pos = self.get_queue_position(job_id_str)
+        logger.info(f"Job {job_id_str} added to queue at position {queue_pos}")
+        event_manager.publish("job_queued", {"job_id": job_id_str, "position": queue_pos, "total": len(self.job_queue)})
         self._broadcast_queue_update()
 
         # 1. Acquire GPU Lock (will wait if another job is processing)
         async with self.gpu_lock:
             # Remove from queue now that we have the lock
-            if job_id in self.job_queue:
-                self.job_queue.remove(job_id)
+            if job_id_str in self.job_queue:
+                self.job_queue.remove(job_id_str)
                 self._broadcast_queue_update()  # Update remaining jobs' positions
 
-            logger.info(f"Starting generation for job {job_id}")
+            logger.info(f"Starting generation for job {job_id_str}")
 
             # 2. Update status to PROCESSING
             try:
                 with Session(db_engine) as session:
                     # check if job still exists
-                    job = session.exec(select(Job).where(Job.id == job_id)).one_or_none()
+                    job = session.exec(select(Job).where(Job.id == job_id_uuid)).one_or_none()
                     if not job:
-                        logger.warning(f"Job {job_id} was deleted before processing started. Aborting.")
+                        logger.warning(f"Job {job_id_str} was deleted before processing started. Aborting.")
                         return
 
                     job.status = JobStatus.PROCESSING
                     session.add(job)
                     session.commit()
-                    logger.info(f"Job {job_id} status updated to PROCESSING")
+                    logger.info(f"Job {job_id_str} status updated to PROCESSING")
             except Exception as e:
                 logger.error(f"Failed to update job status to PROCESSING: {e}")
                 return
 
             try:
                 # 3. Create unique filename
-                output_filename = f"song_{job_id}.mp3"
+                output_filename = f"song_{job_id_str}.mp3"
                 save_path = os.path.abspath(f"backend/generated_audio/{output_filename}")
-                
+
                 # Create Cancellation Event
                 import threading
                 abort_event = threading.Event()
-                self.active_jobs[job_id] = abort_event
+                self.active_jobs[job_id_str] = abort_event
                 
                 # 4. Generate Auto-Title (Robust)
                 from backend.app.services.llm_service import LLMService
@@ -210,9 +227,9 @@ class MusicService:
                     warnings.filterwarnings("ignore", message="In MPS autocast, but the target dtype is not supported")
 
                     loop.call_soon_threadsafe(
-                        event_manager.publish, 
-                        "job_progress", 
-                        {"job_id": str(job_id), "progress": progress, "msg": msg}
+                        event_manager.publish,
+                        "job_progress",
+                        {"job_id": job_id_str, "progress": progress, "msg": msg}
                     )
 
                 def _run_pipeline():
@@ -335,7 +352,7 @@ class MusicService:
                             try:
                                 tokens_dir = os.path.join(os.getcwd(), "backend", "generated_tokens")
                                 os.makedirs(tokens_dir, exist_ok=True)
-                                token_path = os.path.join(tokens_dir, f"{job_id}.pt")
+                                token_path = os.path.join(tokens_dir, f"{job_id_str}.pt")
                                 torch.save(output["tokens"], token_path)
                                 logger.info(f"Saved tokens to {token_path}")
                                 
@@ -348,8 +365,8 @@ class MusicService:
                     return output
                 
                 # Notify Start
-                event_manager.publish("job_update", {"job_id": str(job_id), "status": "processing"})
-                event_manager.publish("job_progress", {"job_id": str(job_id), "progress": 0, "msg": "Starting generation pipeline..."})
+                event_manager.publish("job_update", {"job_id": job_id_str, "status": "processing"})
+                event_manager.publish("job_progress", {"job_id": job_id_str, "progress": 0, "msg": "Starting generation pipeline..."})
 
                 # output variable capture
                 output = await loop.run_in_executor(None, _run_pipeline)
@@ -357,9 +374,9 @@ class MusicService:
                 # 6. Update status to COMPLETED
                 with Session(db_engine) as session:
                     # Re-fetch to avoid stale object
-                    job = session.exec(select(Job).where(Job.id == job_id)).one_or_none()
+                    job = session.exec(select(Job).where(Job.id == job_id_uuid)).one_or_none()
                     if not job:
-                         logger.warning(f"Job {job_id} was deleted during generation. Discarding result.")
+                         logger.warning(f"Job {job_id_str} was deleted during generation. Discarding result.")
                          return
 
                     job.status = JobStatus.COMPLETED
@@ -372,24 +389,24 @@ class MusicService:
                     final_audio_path = job.audio_path
                     final_title = job.title
                 
-                logger.info(f"Job {job_id} completed. Saved to {save_path}")
-                event_manager.publish("job_update", {"job_id": str(job_id), "status": "completed", "audio_path": final_audio_path, "title": final_title})
-                event_manager.publish("job_progress", {"job_id": str(job_id), "progress": 100, "msg": "Done!"})
+                logger.info(f"Job {job_id_str} completed. Saved to {save_path}")
+                event_manager.publish("job_update", {"job_id": job_id_str, "status": "completed", "audio_path": final_audio_path, "title": final_title})
+                event_manager.publish("job_progress", {"job_id": job_id_str, "progress": 100, "msg": "Done!"})
 
             except Exception as e:
-                logger.error(f"Job {job_id} failed: {e}")
+                logger.error(f"Job {job_id_str} failed: {e}")
                 with Session(db_engine) as session:
-                    job = session.exec(select(Job).where(Job.id == job_id)).one()
+                    job = session.exec(select(Job).where(Job.id == job_id_uuid)).one()
                     job.status = JobStatus.FAILED
                     job.error_msg = str(e)
                     session.add(job)
                     session.commit()
-                event_manager.publish("job_update", {"job_id": str(job_id), "status": "failed", "error": str(e)})
+                event_manager.publish("job_update", {"job_id": job_id_str, "status": "failed", "error": str(e)})
 
             finally:
                 # Cleanup cancellation event
-                if job_id in self.active_jobs:
-                    del self.active_jobs[job_id]
+                if job_id_str in self.active_jobs:
+                    del self.active_jobs[job_id_str]
 
                 # Aggressive GPU memory cleanup after each generation
                 try:

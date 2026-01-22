@@ -2,6 +2,10 @@ import asyncio
 import os
 import uuid as uuid_module
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv("backend/.env")
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware

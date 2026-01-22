@@ -15,6 +15,7 @@ type ActiveSection = 'home' | 'favourites' | 'playlists';
 
 function App() {
   const [lyricsModels, setLyricsModels] = useState<LLMModel[]>([]);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
   const [languages, setLanguages] = useState<string[]>([]);
   const [history, setHistory] = useState<Job[]>([]);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -101,10 +102,13 @@ function App() {
         ]);
         setLyricsModels(models);
         setLanguages(langs);
+        setModelsLoaded(true);
       } catch (e) {
         console.error("Failed to load models/languages:", e);
         if (retries > 0) {
           setTimeout(() => loadModelsAndLanguages(retries - 1), 1000);
+        } else {
+          setModelsLoaded(true); // Mark as loaded even on failure
         }
       }
     };
@@ -414,6 +418,7 @@ function App() {
                 onGenerate={handleGenerateMusic}
                 isGenerating={isGenerating}
                 lyricsModels={lyricsModels}
+                modelsLoaded={modelsLoaded}
                 languages={languages}
                 onGenerateLyrics={handleGenerateLyrics}
                 isGeneratingLyrics={isGeneratingLyrics}
@@ -452,6 +457,7 @@ function App() {
                 }}
                 isGenerating={isGenerating}
                 lyricsModels={lyricsModels}
+                modelsLoaded={modelsLoaded}
                 languages={languages}
                 onGenerateLyrics={handleGenerateLyrics}
                 isGeneratingLyrics={isGeneratingLyrics}
