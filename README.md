@@ -409,7 +409,7 @@ OLLAMA_HOST=http://localhost:11434
 | `HEARTMULA_SEQUENTIAL_OFFLOAD` | `auto` | Memory Swap Mode: `auto`, `true`, or `false` |
 | `HEARTMULA_COMPILE` | `false` | torch.compile for ~2x faster inference: `true` or `false` |
 | `HEARTMULA_COMPILE_MODE` | `default` | Compile mode: `default`, `reduce-overhead`, or `max-autotune` |
-| `HEARTMULA_VERSION` | `RL-3B-20260123` | Model version (latest RL-tuned model) |
+| `HEARTMULA_VERSION` | `3B-happy-new-year` | Model version (best quality + lyrics controllability) |
 | `CUDA_VISIBLE_DEVICES` | all GPUs | Specify which GPUs to use (e.g., `0,1`) |
 
 > **Tip:** Most settings can now be changed via the Settings Modal in the UI without restarting.
@@ -545,7 +545,7 @@ HeartMuLa-Studio/
 Models are auto-downloaded to `backend/models/` (~5GB total):
 ```
 backend/models/
-├── HeartMuLa-oss-RL-3B-20260123/   # Main model
+├── HeartMuLa-oss-3B-happy-new-year/ # Main model (default)
 ├── HeartCodec-oss/                  # Audio codec
 ├── tokenizer.json
 └── gen_config.json

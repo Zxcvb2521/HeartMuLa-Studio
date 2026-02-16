@@ -58,10 +58,11 @@ HF_HEARTMULA_GEN_REPO = "HeartMuLa/HeartMuLaGen"  # Contains tokenizer.json and 
 MODEL_VERSIONS = {
     "3B": ("HeartMuLa/HeartMuLa-oss-3B", "HeartMuLa-oss-3B"),
     "RL-3B-20260123": ("HeartMuLa/HeartMuLa-RL-oss-3B-20260123", "HeartMuLa-oss-RL-3B-20260123"),
+    "3B-happy-new-year": ("HeartMuLa/HeartMuLa-oss-3B-happy-new-year", "HeartMuLa-oss-3B-happy-new-year"),
 }
 
-# Default version to use - latest RL-tuned model for best quality
-DEFAULT_VERSION = os.environ.get("HEARTMULA_VERSION", "RL-3B-20260123")
+# Default version to use - best open-source model for lyrics controllability and music quality
+DEFAULT_VERSION = os.environ.get("HEARTMULA_VERSION", "3B-happy-new-year")
 
 # Configuration: GPU mode settings
 # These can be set manually via environment variables, or left as "auto" for automatic detection
